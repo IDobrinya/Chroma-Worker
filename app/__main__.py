@@ -8,7 +8,9 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.loader import model
-from app.utils.auth import verify_token
+from app.utils.verify_token import verify_token
+
+from app.utils.save_result import save_result
 
 app = FastAPI(title=settings.PROJECT)
 
@@ -51,6 +53,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 boxes = list(filter(lambda b: b[5] == filter_label, boxes))
 
             await websocket.send_text(json.dumps(boxes))
+
+            if settings.SAVE_RESULTS:
+                await save_result(image, boxes)
 
     except WebSocketDisconnect:
         logger.error("WebSocket disconnected")

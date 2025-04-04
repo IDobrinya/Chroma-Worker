@@ -27,7 +27,8 @@ class ServerSettings(EnvBaseSettings):
 
 
 class Settings(ClerkSettings, ModelSettings, ServerSettings):
-    pass
+    SAVE_RESULTS: bool = True
+    RESULTS_FOLDER: str = "results"
 
 
 settings = Settings()

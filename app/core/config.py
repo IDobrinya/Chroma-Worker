@@ -8,9 +8,9 @@ class EnvBaseSettings(BaseSettings):
 
 
 class ClerkSettings(EnvBaseSettings):
-    PUBLISHABLE_KEY: str = "app/keys/JWKS_PUBLISHABLE.pem"
+    PUBLISHABLE_KEY_PATH: str = "app/keys/JWKS_PUBLISHABLE.pem"
     JWT_ALGORITHM: str = "RS256"
-    JWT_VERIFICATION: bool = False
+    JWT_VERIFICATION: bool = True
 
 
 class ModelSettings(EnvBaseSettings):

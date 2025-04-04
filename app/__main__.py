@@ -19,25 +19,28 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         data = await websocket.receive_text()
 
-        token_data = json.loads(data)
-        token_encoded = token_data.get("token")
+        if settings.JWT_VERIFICATION:
+            token_data = json.loads(data)
+            token_encoded = token_data.get("token")
 
-        status, message, user_id = await verify_token(token_encoded)
+            status, message, user_id = await verify_token(token_encoded)
+            await websocket.send_text(json.dumps({"status": status, "message": message}))
 
-        await websocket.send_text(json.dumps({"status": status, "message": message}))
-
-        if status == "error":
-            logger.warning("Invalid token")
-            await websocket.close()
-            return
-
-        logger.info(f"User connected successfully | user_id: {user_id}")
+            if status == "error":
+                logger.warning("Token validation not passed")
+                await websocket.close()
+                return
+            logger.info(f"Client connected successfully | user_id: {user_id}")
+        else:
+            logger.info(f"Client connected successfully")
 
         while True:
             frame = await websocket.receive_bytes()
+            logger.debug("Received frame")
             result = [[10.0, 20.0, 300.0, 400.0, 0.95, 1]]
             await websocket.send_text(json.dumps(result))
             await asyncio.sleep(0.1)
+
     except WebSocketDisconnect:
         logger.error("WebSocket disconnected")
 

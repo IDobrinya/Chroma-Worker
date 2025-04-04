@@ -1,37 +1,48 @@
 from fastapi import FastAPI, WebSocket, Request
-from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 import uvicorn
 
-app = FastAPI()
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import json
+import asyncio
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from app.core.config import settings
+from app.utils.auth import verify_token
 
-
-@app.get("/Auth")
-async def auth_check(request: Request):
-    headers = request.headers
-    logger.info(f"Headers: {headers}")
-    return {
-        "status": "success",
-        "message": "Authenticated",
-        "headers": dict(headers)
-    }
+app = FastAPI(title=settings.PROJECT)
 
 
 @app.websocket("/")
-async def predict(
-        websocket: WebSocket,
-):
-    headers = websocket.headers
-    logger.info(f"headers: {headers}")
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
+    try:
+        data = await websocket.receive_text()
 
-uvicorn.run(app, host="localhost", port=8000)
+        token_data = json.loads(data)
+        token_encoded = token_data.get("token")
+
+        status, message, user_id = await verify_token(token_encoded)
+
+        await websocket.send_text(json.dumps({"status": status, "message": message}))
+
+        if status == "error":
+            logger.warning("Invalid token")
+            await websocket.close()
+            return
+
+        logger.info(f"User connected successfully | user_id: {user_id}")
+
+        while True:
+            frame = await websocket.receive_bytes()
+            result = [[10.0, 20.0, 300.0, 400.0, 0.95, 1]]
+            await websocket.send_text(json.dumps(result))
+            await asyncio.sleep(0.1)
+    except WebSocketDisconnect:
+        logger.error("WebSocket disconnected")
+
+
+if __name__ == "__main__":
+    logger.info("Chroma-Worker startup")
+
+    uvicorn.run(app, host=settings.HOST, port=settings.PORT)

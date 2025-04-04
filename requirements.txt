@@ -5,3 +5,6 @@ websockets==15.0.1
 pydantic-settings==2.8.1
 pydantic==2.11.1
 PyJWT==2.10.1
+ultralytics[dill]==8.3.101
+numpy==2.1.1
+opencv-python==4.11.0.86

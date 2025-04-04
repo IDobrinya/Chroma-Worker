@@ -1,10 +1,9 @@
-from fastapi import FastAPI, WebSocket, Request
-from loguru import logger
-import uvicorn
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import json
 import asyncio
+import json
+
+import uvicorn
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from loguru import logger
 
 from app.core.config import settings
 from app.utils.auth import verify_token

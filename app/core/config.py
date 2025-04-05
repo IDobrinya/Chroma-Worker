@@ -8,7 +8,7 @@ class EnvBaseSettings(BaseSettings):
 
 
 class ClerkSettings(EnvBaseSettings):
-    PUBLISHABLE_KEY_PATH: str = "app/keys/JWKS_PUBLISHABLE.pem"
+    PUBLISHABLE_KEY_PATH: str = "app/keys/PUBLISHABLE.pem"
     JWT_ALGORITHM: str = "RS256"
     JWT_VERIFICATION: bool = True
 
@@ -22,12 +22,12 @@ class ModelSettings(EnvBaseSettings):
 
 class ServerSettings(EnvBaseSettings):
     PROJECT: str = "Chroma-Worker"
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    HOST: str = "localhost"
+    PORT: int = 80
 
 
 class Settings(ClerkSettings, ModelSettings, ServerSettings):
-    SAVE_RESULTS: bool = True
+    SAVE_RESULTS: bool = False
     RESULTS_FOLDER: str = "results"
 
 

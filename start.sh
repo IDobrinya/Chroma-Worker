@@ -8,7 +8,7 @@ py -m pip install -r requirements.txt
 py -m pip install ngrok
 if [ -z "$NGROK_AUTHTOKEN" ]; then
     echo "Ошибка: NGROK_AUTHTOKEN не задан."
-    exit 1
+    read
 fi
 set +e
 ngrok config add-authtoken $NGROK_AUTHTOKEN

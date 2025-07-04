@@ -7,18 +7,16 @@ from fastapi import WebSocket, WebSocketDisconnect, APIRouter
 from starlette import status
 
 from src.chroma_ai.services.yolo_service import yolo_service
+from src.chroma_ai.services.connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
 ws_router = APIRouter()
-connection = None
 
 
 @ws_router.websocket("/")
 async def ws(websocket: WebSocket):
-    global connection
-
-    if connection is not None:
+    if connection_manager.is_connected():
         logger.warning("Policy violation: another connection is already active")
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
@@ -26,11 +24,10 @@ async def ws(websocket: WebSocket):
         )
         return
 
-    connection = websocket
     await websocket.accept()
     try:
-        await websocket.receive_text()
-
+        # await websocket.receive_text()
+        connection_manager.set_connected(websocket)
         logger.info("Client connected successfully")
 
         while True:
@@ -51,4 +48,4 @@ async def ws(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Error in WebSocket connection: {e}")
     finally:
-        connection = None
+        connection_manager.set_disconnected()

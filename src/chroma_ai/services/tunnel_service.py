@@ -1,21 +1,20 @@
+import logging
 import re
-import signal
 import subprocess
 import time
 from typing import Optional
 
 from src.chroma_ai.config.config import CLOUDFLARED_PATH
 
+logger = logging.getLogger(__name__)
+
 
 class TunnelManager:
-    def __init__(self, port: int):
+    def __init__(self):
         """
         Initialize tunnel manager
-
-        Args:
-            port: Local port to expose through the tunnel
         """
-        self.port = port
+        self.port = 8000
         self.process: Optional[subprocess.Popen] = None
         self.tunnel_url: Optional[str] = None
 
@@ -24,7 +23,7 @@ class TunnelManager:
         if not self.cloudflared_path.exists():
             raise FileNotFoundError(f"cloudflared binary not found at {self.cloudflared_path}")
 
-    def start(self) -> str:
+    def start(self, port: int) -> str:
         """
         Start the tunnel and return the public URL
 
@@ -34,6 +33,7 @@ class TunnelManager:
         Raises:
             RuntimeError: If tunnel fails to start or URL cannot be parsed
         """
+        self.port = port
         if self.process:
             return self.tunnel_url if self.tunnel_url else ""
 
@@ -42,7 +42,7 @@ class TunnelManager:
             str(self.cloudflared_path),
             "tunnel",
             "--url",
-            f"wss://localhost:{self.port}"
+            f"http://localhost:{self.port}"
         ]
 
         # Start cloudflared process
@@ -68,6 +68,7 @@ class TunnelManager:
             url_match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
             if url_match:
                 self.tunnel_url = url_match.group(0)
+                logger.info(f"Tunnel URL: {self.tunnel_url}")
                 return self.tunnel_url
 
             time.sleep(0.5)
@@ -77,20 +78,15 @@ class TunnelManager:
     def stop(self) -> None:
         """Stop the tunnel if it's running"""
         if self.process:
-            self.process.send_signal(signal.CTRL_BREAK_EVENT)
-
-            self.process.wait()
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait()
+            
             self.process = None
             self.tunnel_url = None
-
-    def __enter__(self):
-        """Context manager support"""
-        self.start()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager support"""
-        self.stop()
 
     @property
     def is_running(self) -> bool:
@@ -98,7 +94,4 @@ class TunnelManager:
         return self.process is not None and self.process.poll() is None
 
 
-if __name__ == "__main__":
-    with TunnelManager(80) as tunnel:
-        url = tunnel.tunnel_url
-        print(url)
+tunnel_manager = TunnelManager()

@@ -27,7 +27,7 @@ async def ws(websocket: WebSocket):
     await websocket.accept()
     try:
         # await websocket.receive_text()
-        connection_manager.set_connected(websocket)
+        connection_manager.set_connected()
         logger.info("Client connected successfully")
 
         while True:

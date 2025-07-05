@@ -39,11 +39,11 @@ class ChromaAIGui:
 
         self.token = token_manager.get_token()
 
+        app_manager.add_observer(self.on_app_state_changed)
+
         self.setup_ui()
 
-        connection_manager.add_observer(self.on_connection_state_changed)
-
-        self.update_ui_state(None)
+        self.update_ui_state(ApplicationState.INITIALIZING)
         self.update_connection_time(None)
         self.start_spinner_animation(None)
 
@@ -109,7 +109,7 @@ class ChromaAIGui:
 
         self.loading_message = ttk.Label(
             loading_section,
-            text="Запускается сервер и создается туннель...",
+            text="Подождите немного...",
             font=("Arial", 11),
             foreground="gray"
         )
@@ -140,6 +140,18 @@ class ChromaAIGui:
 
         self.qr_label = ttk.Label(qr_section)
         self.qr_label.pack(expand=True)
+        
+        qr = QRCode(version=1, box_size=8, border=2)
+        qr.add_data(self.token)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        img = img.resize((300, 300), Image.Resampling.LANCZOS)
+        
+        photo = ImageTk.PhotoImage(img)
+        # noinspection PyTypeChecker
+        self.qr_label.config(image=photo)
+        self.qr_label.image = photo
 
     def setup_connected_ui(self, parent):
         """Setup UI for connected state"""
@@ -166,23 +178,6 @@ class ChromaAIGui:
         self.connection_time_label = ttk.Label(time_frame, text="00:00:00", font=("Arial", 14))
         self.connection_time_label.pack(anchor="w", pady=(5, 0))
 
-        url_section = ttk.Frame(status_section)
-        url_section.pack(fill="x", pady=(0, 20))
-
-        ttk.Label(url_section, text="Tunnel URL:", font=("Arial", 12, "bold")).pack(anchor="w")
-
-        url_frame = ttk.Frame(url_section)
-        url_frame.pack(fill="x", pady=(5, 0))
-
-        self.url_var = tk.StringVar()
-        self.url_entry = ttk.Entry(
-            url_frame,
-            textvariable=self.url_var,
-            state="readonly",
-            font=("Arial", 10)
-        )
-        self.url_entry.pack(side="left", fill="x", expand=True, ipady=3)
-
         control_frame = ttk.Frame(self.connected_frame)
         control_frame.pack(fill="x", pady=(20, 0))
 
@@ -201,20 +196,10 @@ class ChromaAIGui:
 
         self.root.after(100, self.start_spinner_animation, None)
 
-    def update_loading_progress(self, message):
-        """Update loading progress message"""
-        if hasattr(self, 'progress_label'):
-            self.root.after(0, self.progress_label.config, message)
+    def on_app_state_changed(self, state: ApplicationState):
+        self.root.after(0, self.update_ui_state, state)
 
-    def on_connection_state_changed(self, _):
-        """Handle connection state changes"""
-        self.root.after(0, self.update_ui_state, None)
-
-    def update_ui_state(self, _):
-        """Update UI based on connection and application state"""
-        is_connected = connection_manager.is_connected()
-        app_state = app_manager.get_state()
-
+    def update_ui_state(self, state: ApplicationState):
         if hasattr(self, 'loading_frame'):
             self.loading_frame.pack_forget()
         if hasattr(self, 'disconnected_frame'):
@@ -222,24 +207,12 @@ class ChromaAIGui:
         if hasattr(self, 'connected_frame'):
             self.connected_frame.pack_forget()
 
-        if app_state in [ApplicationState.INITIALIZING, ApplicationState.STARTING]:
-            if hasattr(self, 'loading_frame'):
-                self.loading_frame.pack(fill="both", expand=True)
-                self.update_loading_message_for_state(app_state)
-        elif is_connected:
-            if hasattr(self, 'connected_frame'):
-                self.connected_frame.pack(fill="both", expand=True)
+        if state in [ApplicationState.INITIALIZING, ApplicationState.STARTING]:
+            self.loading_frame.pack(fill="both", expand=True)
+        elif state == ApplicationState.CONNECTED:
+            self.connected_frame.pack(fill="both", expand=True)
         else:
-            if hasattr(self, 'disconnected_frame'):
-                self.disconnected_frame.pack(fill="both", expand=True)
-                self.generate_qr_code()
-
-    def update_loading_message_for_state(self, app_state: ApplicationState):
-        """Update loading message based on application state"""
-        if app_state == ApplicationState.INITIALIZING:
-            self.update_loading_progress("Инициализация...")
-        elif app_state == ApplicationState.STARTING:
-            self.update_loading_progress("Запуск сервисов...")
+            self.disconnected_frame.pack(fill="both", expand=True)
 
     def update_connection_time(self, _):
         """Update connection time display"""
@@ -254,18 +227,6 @@ class ChromaAIGui:
 
         self.root.after(1000, self.update_connection_time, None)
 
-    def generate_qr_code(self):
-        if self.qr_label:
-            qr = QRCode(version=1, box_size=8, border=2)
-            qr.add_data(self.token)
-            qr.make(fit=True)
-
-            img = qr.make_image(fill_color="black", back_color="white")
-            img = img.resize((300, 300), Image.Resampling.LANCZOS)
-
-            photo = ImageTk.PhotoImage(img)
-            self.qr_label.config(image=photo)
-            self.qr_label.image = photo
 
     @staticmethod
     def reset_connection():
@@ -281,4 +242,4 @@ class ChromaAIGui:
         self.root.mainloop()
 
     def __del__(self):
-        connection_manager.remove_observer(self.on_connection_state_changed)
+        app_manager.remove_observer(self.on_app_state_changed)

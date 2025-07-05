@@ -1,3 +1,4 @@
+import threading
 import logging
 
 from src.chroma_ai.services.app_manager import app_manager
@@ -10,13 +11,13 @@ logger = logging.getLogger(__name__)
 def main():
     logger.info("Starting Chroma AI Client")
 
-    logger.info("Starting services")
-    app_manager.start_services()
+    gui = ChromaAIGui()
+
+    logger.info("Starting services in background")
+    threading.Thread(target=app_manager.start_services, daemon=True).start()
 
     logger.info("Starting GUI")
-    gui = ChromaAIGui()
     gui.run()
-
 
 if __name__ == "__main__":
     main()

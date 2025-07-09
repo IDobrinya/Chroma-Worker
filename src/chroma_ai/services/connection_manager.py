@@ -2,8 +2,6 @@ import time
 from enum import Enum
 from typing import Optional, Callable
 
-from starlette.websockets import WebSocket
-
 
 class ConnectionState(Enum):
     DISCONNECTED = "disconnected"

@@ -1,0 +1,103 @@
+{
+	"info": {
+		"_postman_id": "serverAPI",
+		"name": "Server Agent",
+		"description": "API endpoints for Chroma AI Server Agent (runs on user's PC)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Register Server",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"sk-1234567890abcdef\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/servers/register",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"servers",
+						"register"
+					]
+				},
+				"description": "Регистрирует сервер агента в реестре при первом запуске"
+			}
+		},
+		{
+			"name": "Set Tunnel URL",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"sk-1234567890abcdef\",\n    \"bridge_url\": \"https://tunnel-example.trycloudflare.com\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/servers/tunnel",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"servers",
+						"tunnel"
+					]
+				},
+				"description": "Устанавливает URL туннеля Cloudflare для сервера агента"
+			}
+		},
+		{
+			"name": "Unlink All Devices",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"sk-1234567890abcdef\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/servers/devices",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"servers",
+						"devices"
+					]
+				},
+				"description": "Отвязывает все устройства от сервера (сброс всех подключений)"
+			}
+		}
+	]
+}

@@ -3,8 +3,10 @@ import re
 import subprocess
 import time
 from typing import Optional
+import requests
 
-from src.chroma_ai.config.config import CLOUDFLARED_PATH
+from src.chroma_ai.config.config import CLOUDFLARED_PATH, SERVER_API_BASE
+from src.chroma_ai.auth.instance_token import token_manager
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,9 @@ class TunnelManager:
             if url_match:
                 self.tunnel_url = url_match.group(0)
                 logger.info(f"Tunnel URL: {self.tunnel_url}")
+                
+                self._register_tunnel_url()
+                
                 return self.tunnel_url
 
             time.sleep(0.5)
@@ -87,6 +92,30 @@ class TunnelManager:
             
             self.process = None
             self.tunnel_url = None
+
+    def _register_tunnel_url(self) -> None:
+        """Register tunnel URL with central server"""
+        if not self.tunnel_url:
+            return
+        
+        try:
+            token = token_manager.get_token()
+            url = f"{SERVER_API_BASE}/servers/tunnel"
+            
+            payload = {
+                "token": token,
+                "bridge_url": self.tunnel_url
+            }
+            
+            response = requests.put(url, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully registered tunnel URL with central server")
+            else:
+                logger.warning(f"Failed to register tunnel URL: {response.status_code} - {response.text}")
+        
+        except Exception as e:
+            logger.error(f"Error registering tunnel URL: {e}")
 
     @property
     def is_running(self) -> bool:

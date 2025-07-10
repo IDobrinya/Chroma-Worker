@@ -58,6 +58,3 @@ logs/
 # Claude
 CLAUDE.md
 **/.claude/settings.local.json
-
-# Binaries
-cloudflared.exe

@@ -142,7 +142,9 @@ class DetectionService:
             if boxes:
                 image_with_boxes = self._draw_bounding_boxes(image, boxes)
                 self._notify_image_observers(image_with_boxes)
-            
+            else:
+                self._notify_image_observers(image)
+
             return boxes
         return []
 

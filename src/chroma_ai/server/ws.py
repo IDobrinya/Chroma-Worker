@@ -25,11 +25,12 @@ async def ws(websocket: WebSocket):
         return
 
     await websocket.accept()
-    try:
-        # await websocket.receive_text()
-        connection_manager.set_connected()
-        logger.info("Client connected successfully")
+    connection_manager.set_connected()
 
+    await websocket.send_text(json.dumps({"status": "success"}))
+    logger.info("Client connected successfully")
+
+    try:
         while True:
             frame_bytes = await websocket.receive_bytes()
 

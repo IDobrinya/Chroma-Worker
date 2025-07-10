@@ -1,3 +1,4 @@
+import logging
 import time
 import tkinter as tk
 from datetime import datetime
@@ -12,11 +13,16 @@ from qrcode.main import QRCode
 from src.chroma_ai.auth.instance_token import token_manager
 from src.chroma_ai.services.app_manager import app_manager, ApplicationState
 from src.chroma_ai.services.connection_manager import connection_manager
-from src.chroma_ai.services.detection_service import detection_service, DetectionEvent
+from src.chroma_ai.services.detection_service import detection_service
+
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
 
 
 class ChromaAIGui:
-    def __init__(self):
+    def __init__(self, connection_flag: bool = False):
+        self.connection_flag = connection_flag
+
         self.qr_label = None
         self.url_entry = None
         self.url_var = None
@@ -56,7 +62,7 @@ class ChromaAIGui:
 
         app_manager.add_observer(self.on_app_state_changed)
         
-        detection_service.add_observer(self.on_detection_event)
+        detection_service.add_log_observer(self.on_detection_event)
         detection_service.add_image_observer(self.on_image_processed)
         detection_service.add_speed_observer(self.on_speed_update)
 
@@ -80,11 +86,21 @@ class ChromaAIGui:
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.pack(fill="both", expand=True)
 
-        self.setup_loading_ui(main_frame)
+        if not self.connection_flag:
+            error_label = ttk.Label(
+                main_frame,
+                text="Неизвестная ошибка. Проверьте подключение к интернету",
+                font=("Arial", 14, "bold"),
+                foreground="red"
+            )
+            error_label.pack(pady=40)
 
-        self.setup_disconnected_ui(main_frame)
+        else:
+            self.setup_loading_ui(main_frame)
 
-        self.setup_connected_ui(main_frame)
+            self.setup_disconnected_ui(main_frame)
+
+            self.setup_connected_ui(main_frame)
 
         footer_frame = ttk.Frame(self.root, padding="10")
         footer_frame.pack(fill="x", side="bottom")
@@ -142,7 +158,7 @@ class ChromaAIGui:
         self.disconnected_frame = ttk.Frame(parent)
 
         connection_frame = ttk.Frame(self.disconnected_frame, padding="10")
-        connection_frame.pack(fill="x", pady=(0, 20))
+        connection_frame.pack(fill="x")
 
         qr_section = ttk.Frame(self.disconnected_frame)
         qr_section.pack(fill="both", expand=True)
@@ -171,6 +187,13 @@ class ChromaAIGui:
         # noinspection PyTypeChecker
         self.qr_label.config(image=photo)
         self.qr_label.image = photo
+
+        token_label = ttk.Label(
+            qr_section,
+            text=f"Или введите токен вручную: {self.token}",
+            font=("Arial", 12)
+        )
+        token_label.pack(pady=(20, 0))
 
     def setup_connected_ui(self, parent):
         self.connected_frame = ttk.Frame(parent)
@@ -227,7 +250,7 @@ class ChromaAIGui:
 
     def start_spinner_animation(self, _):
         """Start spinner animation"""
-        if self.is_loading and hasattr(self, 'spinner_label'):
+        if self.is_loading and self.spinner_label:
             self.spinner_index = (self.spinner_index + 1) % len(self.spinner_chars)
             self.spinner_label.config(text=self.spinner_chars[self.spinner_index])
 
@@ -237,18 +260,18 @@ class ChromaAIGui:
         self.root.after(0, self.update_ui_state, state)
 
     def update_ui_state(self, state: ApplicationState):
-        if hasattr(self, 'loading_frame'):
+        if self.loading_frame:
             self.loading_frame.pack_forget()
-        if hasattr(self, 'disconnected_frame'):
+        if self.disconnected_frame:
             self.disconnected_frame.pack_forget()
-        if hasattr(self, 'connected_frame'):
+        if self.connected_frame:
             self.connected_frame.pack_forget()
 
-        if state in [ApplicationState.INITIALIZING, ApplicationState.STARTING]:
+        if state in [ApplicationState.INITIALIZING, ApplicationState.STARTING] and self.loading_frame:
             self.loading_frame.pack(fill="both", expand=True)
-        elif state == ApplicationState.CONNECTED:
+        elif state == ApplicationState.CONNECTED and self.connected_frame:
             self.connected_frame.pack(fill="both", expand=True)
-        else:
+        elif self.disconnected_frame:
             self.disconnected_frame.pack(fill="both", expand=True)
 
     def update_connection_time(self, _):
@@ -259,18 +282,17 @@ class ChromaAIGui:
             minutes = int((elapsed % 3600) // 60)
             seconds = int(elapsed % 60)
             time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            if hasattr(self, 'connection_time_label') and self.connection_time_label:
+            if self.connection_time_label:
                 self.connection_time_label.config(text=time_str)
 
         self.root.after(1000, self.update_connection_time, None)
 
-    def on_detection_event(self, event: DetectionEvent):
+    def on_detection_event(self, log: str):
         """Handle detection event from DetectionService"""
         try:
-            log_entry = f"{event.color.display_name} detected (conf: {event.confidence:.2f})"
-            self.root.after(0, self.add_event_log_entry, log_entry)
+            self.root.after(0, self.add_event_log_entry, log)
         except Exception as e:
-            print(f"Error handling detection event: {e}")
+            logger.error(f"Error handling detection event: {e}")
 
     def on_image_processed(self, image: np.ndarray):
         """Handle processed image with bounding boxes"""
@@ -294,14 +316,14 @@ class ChromaAIGui:
 
             self.root.after(0, self.update_camera_feed, photo)
         except Exception as e:
-            print(f"Error processing image: {e}")
+            logger.error(f"Error processing image: {e}")
 
     def on_speed_update(self, fps: float):
         """Handle processing speed update"""
         try:
             self.root.after(0, self.update_speed_display, fps)
         except Exception as e:
-            print(f"Error handling speed update: {e}")
+            logger.error(f"Error handling speed update: {e}")
 
     def update_camera_feed(self, photo):
         """Update camera feed display"""
@@ -310,7 +332,7 @@ class ChromaAIGui:
                 self.camera_feed_label.config(image=photo)
                 self.camera_feed_label.image = photo
         except Exception as e:
-            print(f"Error updating camera feed: {e}")
+            logger.error(f"Error updating camera feed: {e}")
 
     def update_speed_display(self, fps: float):
         """Update processing speed display"""
@@ -318,7 +340,7 @@ class ChromaAIGui:
             if self.speed_label:
                 self.speed_label.config(text=f"{fps:.1f} FPS")
         except Exception as e:
-            print(f"Error updating speed display: {e}")
+            logger.error(f"Error updating speed display: {e}")
 
 
     def add_event_log_entry(self, message: str):
@@ -339,7 +361,7 @@ class ChromaAIGui:
                 self.event_log_text.config(state='disabled')
                 self.event_log_text.see(tk.END)
         except Exception as e:
-            print(f"Error adding event log entry: {e}")
+            logger.error(f"Error adding event log entry: {e}")
 
     def disconnect_connection(self):
         """Disconnect from current connection"""
@@ -365,6 +387,6 @@ class ChromaAIGui:
 
     def __del__(self):
         app_manager.remove_observer(self.on_app_state_changed)
-        detection_service.remove_observer(self.on_detection_event)
+        detection_service.remove_log_observer(self.on_detection_event)
         detection_service.remove_image_observer(self.on_image_processed)
         detection_service.remove_speed_observer(self.on_speed_update)

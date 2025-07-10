@@ -13,12 +13,13 @@ def main():
     logger.info("Starting Chroma AI Client")
 
     logger.info("Registering server")
-    token_manager.register_server()
+    is_registered = token_manager.register_server()
 
-    gui = ChromaAIGui()
+    gui = ChromaAIGui(is_registered)
 
-    logger.info("Starting services in background")
-    threading.Thread(target=app_manager.start_services, daemon=True).start()
+    if is_registered:
+        logger.info("Starting services in background")
+        threading.Thread(target=app_manager.start_services, daemon=True).start()
 
     logger.info("Starting GUI")
     gui.run()

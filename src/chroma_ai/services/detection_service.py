@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
 from typing import List, Callable, Optional, Awaitable
 
 import cv2
@@ -41,19 +40,11 @@ class TrafficLightColor(Enum):
         return 128, 128, 128
 
 
-class DetectionEvent:
-    def __init__(self, color: TrafficLightColor, confidence: float, bbox: List[float], timestamp: datetime):
-        self.color = color
-        self.confidence = confidence
-        self.bbox = bbox
-        self.timestamp = timestamp
-
-
 class DetectionService:
     def __init__(self):
         self.model = YOLO(MODEL_PATH)
         self._interval_callback: Optional[Callable] = None
-        self._observers: List[Callable[[DetectionEvent], None]] = []
+        self._log_observers: List[Callable[[str], None]] = []
         self._image_observers: List[Callable[[MatLike], None]] = []
         self._speed_observers: List[Callable[[float], None]] = []
         
@@ -66,14 +57,14 @@ class DetectionService:
         """Set callback for interval adjustments"""
         self._interval_callback = callback
 
-    def add_observer(self, observer: Callable[[DetectionEvent], None]):
+    def add_log_observer(self, observer: Callable[[str], None]):
         """Add observer for detection events"""
-        self._observers.append(observer)
+        self._log_observers.append(observer)
 
-    def remove_observer(self, observer: Callable[[DetectionEvent], None]):
+    def remove_log_observer(self, observer: Callable[[str], None]):
         """Remove observer for detection events"""
-        if observer in self._observers:
-            self._observers.remove(observer)
+        if observer in self._log_observers:
+            self._log_observers.remove(observer)
 
     def add_image_observer(self, observer: Callable[[MatLike], None]):
         """Add observer for processed images with bounding boxes"""
@@ -117,13 +108,16 @@ class DetectionService:
                 if self._interval_callback:
                     logger.info(f"Capture interval set to {new_interval} ms")
                     asyncio.create_task(self._interval_callback(new_interval))
+
+                    self._notify_log_observers(f"Capture interval adjusted to {new_interval} ms")
+
                     self._last_interval_adjustment = current_time
 
-    def _notify_observers(self, event: DetectionEvent):
+    def _notify_log_observers(self, log: str):
         """Notify all observers about detection event"""
-        for observer in self._observers:
+        for observer in self._log_observers:
             try:
-                observer(event)
+                observer(log)
             except Exception as e:
                 logger.error(f"Error in detection observer: {e}")
 
@@ -177,16 +171,13 @@ class DetectionService:
             boxes = results[0].boxes.data.cpu().numpy().tolist()
             boxes = [[round(x, 2) for x in box] for box in boxes]
             
-            timestamp = datetime.now()
             for box in boxes:
                 if len(box) >= 6:
-                    bbox = box[:4]
                     confidence = box[4]
                     class_id = int(box[5])
                     color = [TrafficLightColor.GREEN, TrafficLightColor.RED, TrafficLightColor.YELLOW][class_id]
-                    
-                    event = DetectionEvent(color, confidence, bbox, timestamp)
-                    self._notify_observers(event)
+
+                    self._notify_log_observers(f"{color} Detected | Conf: {confidence:.2f}")
             
             if boxes:
                 image_with_boxes = self._draw_bounding_boxes(image, boxes)

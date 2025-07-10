@@ -1,12 +1,14 @@
+import asyncio
 import logging
+import time
 from datetime import datetime
-from typing import List, Callable
+from typing import List, Callable, Optional, Awaitable
 
 import cv2
 from cv2.typing import MatLike
 from ultralytics import YOLO
 
-from src.chroma_ai.config.config import MODEL_PATH
+from src.chroma_ai.config.config import MODEL_PATH, BUFFERING_MULTIPLYER
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +52,19 @@ class DetectionEvent:
 class DetectionService:
     def __init__(self):
         self.model = YOLO(MODEL_PATH)
+        self._interval_callback: Optional[Callable] = None
         self._observers: List[Callable[[DetectionEvent], None]] = []
         self._image_observers: List[Callable[[MatLike], None]] = []
+        self._speed_observers: List[Callable[[float], None]] = []
+        
+        self._processing_times: List[float] = []
+        self._last_processing_time: Optional[float] = None
+        self._samples_count = 10
+        self._last_interval_adjustment = 0
+
+    def set_interval_callback(self, callback: Callable[[int], Awaitable[None]]):
+        """Set callback for interval adjustments"""
+        self._interval_callback = callback
 
     def add_observer(self, observer: Callable[[DetectionEvent], None]):
         """Add observer for detection events"""
@@ -71,6 +84,41 @@ class DetectionService:
         if observer in self._image_observers:
             self._image_observers.remove(observer)
 
+    def add_speed_observer(self, observer: Callable[[float], None]):
+        """Add observer for processing speed updates"""
+        self._speed_observers.append(observer)
+
+    def remove_speed_observer(self, observer: Callable[[float], None]):
+        """Remove observer for processing speed updates"""
+        if observer in self._speed_observers:
+            self._speed_observers.remove(observer)
+
+    def _update_processing_stats(self, processing_time: float):
+        """Update processing statistics and adjust interval if needed"""
+        self._processing_times.append(processing_time)
+        
+        if len(self._processing_times) > self._samples_count:
+            self._processing_times.pop(0)
+        
+        avg_processing_time = sum(self._processing_times) / len(self._processing_times)
+        fps = 1.0 / avg_processing_time if avg_processing_time > 0 else 0
+        
+        for observer in self._speed_observers:
+            try:
+                observer(fps)
+            except Exception as e:
+                logger.error(f"Error in speed observer: {e}")
+        
+        if len(self._processing_times) >= self._samples_count:
+            current_time = time.time()
+            if current_time - self._last_interval_adjustment > 5:
+                new_interval = max(40, int(avg_processing_time * 1000 * BUFFERING_MULTIPLYER))
+                
+                if self._interval_callback:
+                    logger.info(f"Capture interval set to {new_interval} ms")
+                    asyncio.create_task(self._interval_callback(new_interval))
+                    self._last_interval_adjustment = current_time
+
     def _notify_observers(self, event: DetectionEvent):
         """Notify all observers about detection event"""
         for observer in self._observers:
@@ -88,19 +136,7 @@ class DetectionService:
                 logger.error(f"Error in image observer: {e}")
 
     @staticmethod
-    def _classify_traffic_light(bbox: List[float]) -> TrafficLightColor:
-        """Classify traffic light color based on bounding box position"""
-        y_center = (bbox[1] + bbox[3]) / 2
-        image_height = 640
-        
-        if y_center < image_height / 3:
-            return TrafficLightColor.RED
-        elif y_center < 2 * image_height / 3:
-            return TrafficLightColor.YELLOW
-        else:
-            return TrafficLightColor.GREEN
-
-    def _draw_bounding_boxes(self, image: MatLike, boxes: List[List[float]]) -> MatLike:
+    def _draw_bounding_boxes(image: MatLike, boxes: List[List[int | float]]) -> MatLike:
         """Draw bounding boxes on image"""
         image_copy = image.copy()
         
@@ -110,20 +146,32 @@ class DetectionService:
                 
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 
-                color = self._classify_traffic_light([x1, y1, x2, y2])
+                color = [TrafficLightColor.GREEN, TrafficLightColor.RED, TrafficLightColor.YELLOW][int(class_id)]
                 rgb_color = color.color_rgb
                 
                 cv2.rectangle(image_copy, (x1, y1), (x2, y2), rgb_color, 2)
                 
                 label = f"{color.display_name} {confidence:.2f}"
-                cv2.putText(image_copy, label, (x1, y1 - 10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, rgb_color, 2)
-        
+                cv2.putText(
+                    image_copy,
+                    label,
+                    (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    rgb_color,
+                    2
+                )
+
         return image_copy
 
     def predict(self, image: MatLike) -> List[list[float | int]]:
         """Predict bounding boxes in the image using YOLO"""
+        start_time = time.time()
+        
         results = self.model.predict(image)
+        
+        processing_time = time.time() - start_time
+        self._update_processing_stats(processing_time)
 
         if results and results[0].boxes.data is not None:
             boxes = results[0].boxes.data.cpu().numpy().tolist()
@@ -134,7 +182,8 @@ class DetectionService:
                 if len(box) >= 6:
                     bbox = box[:4]
                     confidence = box[4]
-                    color = self._classify_traffic_light(bbox)
+                    class_id = int(box[5])
+                    color = [TrafficLightColor.GREEN, TrafficLightColor.RED, TrafficLightColor.YELLOW][class_id]
                     
                     event = DetectionEvent(color, confidence, bbox, timestamp)
                     self._notify_observers(event)

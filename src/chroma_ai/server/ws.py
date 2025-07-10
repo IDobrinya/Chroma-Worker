@@ -27,6 +27,13 @@ async def ws(websocket: WebSocket):
     await websocket.accept()
     connection_manager.set_connected()
 
+    async def callback(interval):
+        await websocket.send_text(json.dumps({"type": "set_interval", "interval": interval}))
+
+    detection_service.set_interval_callback(
+        callback
+    )
+
     await websocket.send_text(json.dumps({"status": "success"}))
     logger.info("Client connected successfully")
 

@@ -1,11 +1,11 @@
 import time
 import tkinter as tk
+from datetime import datetime
 from tkinter import ttk, messagebox, scrolledtext
 from typing import List
+
 import cv2
 import numpy as np
-from datetime import datetime
-
 from PIL import Image, ImageTk
 from qrcode.main import QRCode
 
@@ -31,6 +31,7 @@ class ChromaAIGui:
         self.camera_feed_label = None
         self.event_log_text = None
         self.current_image = None
+        self.speed_label = None
 
         self.loading_frame = None
         self.disconnected_frame = None
@@ -55,9 +56,9 @@ class ChromaAIGui:
 
         app_manager.add_observer(self.on_app_state_changed)
         
-        # Add observers for detection events
         detection_service.add_observer(self.on_detection_event)
         detection_service.add_image_observer(self.on_image_processed)
+        detection_service.add_speed_observer(self.on_speed_update)
 
         self.setup_ui()
 
@@ -205,6 +206,11 @@ class ChromaAIGui:
         self.connection_time_label = ttk.Label(status_frame, text="00:00:00", font=("Arial", 12))
         self.connection_time_label.pack(anchor="w", pady=(5, 0))
 
+        speed_label = ttk.Label(status_frame, text="Скорость:", font=("Arial", 10, "bold"))
+        speed_label.pack(anchor="w", pady=(10, 0))
+        self.speed_label = ttk.Label(status_frame, text="0.0 FPS", font=("Arial", 12))
+        self.speed_label.pack(anchor="w", pady=(5, 0))
+
         log_frame = ttk.LabelFrame(right_frame, text="Event Log", padding="10")
         log_frame.pack(fill="both", expand=True, pady=(10, 0))
 
@@ -290,14 +296,30 @@ class ChromaAIGui:
         except Exception as e:
             print(f"Error processing image: {e}")
 
+    def on_speed_update(self, fps: float):
+        """Handle processing speed update"""
+        try:
+            self.root.after(0, self.update_speed_display, fps)
+        except Exception as e:
+            print(f"Error handling speed update: {e}")
+
     def update_camera_feed(self, photo):
         """Update camera feed display"""
         try:
             if self.camera_feed_label:
                 self.camera_feed_label.config(image=photo)
-                self.camera_feed_label.image = photo  # Keep a reference
+                self.camera_feed_label.image = photo
         except Exception as e:
             print(f"Error updating camera feed: {e}")
+
+    def update_speed_display(self, fps: float):
+        """Update processing speed display"""
+        try:
+            if self.speed_label:
+                self.speed_label.config(text=f"{fps:.1f} FPS")
+        except Exception as e:
+            print(f"Error updating speed display: {e}")
+
 
     def add_event_log_entry(self, message: str):
         """Add entry to event log"""
@@ -345,3 +367,4 @@ class ChromaAIGui:
         app_manager.remove_observer(self.on_app_state_changed)
         detection_service.remove_observer(self.on_detection_event)
         detection_service.remove_image_observer(self.on_image_processed)
+        detection_service.remove_speed_observer(self.on_speed_update)

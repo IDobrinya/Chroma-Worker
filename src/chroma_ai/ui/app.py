@@ -11,6 +11,7 @@ from PIL import Image, ImageTk
 from qrcode.main import QRCode
 
 from src.chroma_ai.auth.instance_token import token_manager
+from src.chroma_ai.config.config import WEB_CLIENT_URL
 from src.chroma_ai.services.app_manager import app_manager, ApplicationState
 from src.chroma_ai.services.connection_manager import connection_manager
 from src.chroma_ai.services.detection_service import detection_service
@@ -177,7 +178,7 @@ class ChromaAIGui:
         self.qr_label.pack(expand=True)
         
         qr = QRCode(version=1, box_size=8, border=2)
-        qr.add_data(self.token)
+        qr.add_data(f"{WEB_CLIENT_URL}/connect?token={self.token}")
         qr.make(fit=True)
         
         img = qr.make_image(fill_color="black", back_color="white")

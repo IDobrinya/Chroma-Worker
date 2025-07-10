@@ -6,7 +6,7 @@ import cv2
 from fastapi import WebSocket, WebSocketDisconnect, APIRouter
 from starlette import status
 
-from src.chroma_ai.services.yolo_service import yolo_service
+from src.chroma_ai.services.detection_service import detection_service
 from src.chroma_ai.services.connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def ws(websocket: WebSocket):
                 logger.error("Received invalid image data")
                 continue
 
-            boxes = yolo_service.predict(image)
+            boxes = detection_service.predict(image)
             await websocket.send_text(json.dumps(boxes))
 
     except WebSocketDisconnect:

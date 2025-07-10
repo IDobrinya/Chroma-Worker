@@ -57,7 +57,6 @@ class TunnelManager:
             universal_newlines=True
         )
 
-        # Wait for tunnel URL to appear in output
         start_time = time.time()
         while time.time() - start_time < 15:
             if not self.process.stdout:
@@ -69,7 +68,7 @@ class TunnelManager:
 
             url_match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
             if url_match:
-                self.tunnel_url = url_match.group(0)
+                self.tunnel_url = url_match.group(0).replace("https", "wss")
                 logger.info(f"Tunnel URL: {self.tunnel_url}")
                 
                 self._register_tunnel_url()

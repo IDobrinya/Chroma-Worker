@@ -1,6 +1,10 @@
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, scrolledtext
+from typing import List
+import cv2
+import numpy as np
+from datetime import datetime
 
 from PIL import Image, ImageTk
 from qrcode.main import QRCode
@@ -8,6 +12,7 @@ from qrcode.main import QRCode
 from src.chroma_ai.auth.instance_token import token_manager
 from src.chroma_ai.services.app_manager import app_manager, ApplicationState
 from src.chroma_ai.services.connection_manager import connection_manager
+from src.chroma_ai.services.detection_service import detection_service, DetectionEvent
 
 
 class ChromaAIGui:
@@ -22,6 +27,11 @@ class ChromaAIGui:
         self.progress_label = None
         self.spinner_label = None
 
+        # Live camera feed components
+        self.camera_feed_label = None
+        self.event_log_text = None
+        self.current_image = None
+
         self.loading_frame = None
         self.disconnected_frame = None
         self.connected_frame = None
@@ -30,9 +40,13 @@ class ChromaAIGui:
         self.spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_index = 0
 
+        # Event log storage
+        self.event_log_entries: List[str] = []
+        self.max_log_entries = 100
+
         self.root = tk.Tk()
         self.root.title("Chroma AI Client")
-        self.root.geometry("600x600")
+        self.root.geometry("800x600")
         self.root.resizable(False, False)
 
         self.server_thread = None
@@ -40,6 +54,10 @@ class ChromaAIGui:
         self.token = token_manager.get_token()
 
         app_manager.add_observer(self.on_app_state_changed)
+        
+        # Add observers for detection events
+        detection_service.add_observer(self.on_detection_event)
+        detection_service.add_image_observer(self.on_image_processed)
 
         self.setup_ui()
 
@@ -154,39 +172,52 @@ class ChromaAIGui:
         self.qr_label.image = photo
 
     def setup_connected_ui(self, parent):
-        """Setup UI for connected state"""
         self.connected_frame = ttk.Frame(parent)
 
-        status_section = ttk.Frame(self.connected_frame, padding="20")
-        status_section.pack(fill="x", pady=(0, 20))
+        top_frame = ttk.Frame(self.connected_frame)
+        top_frame.pack(fill="x", pady=(0, 10))
 
-        status_frame = ttk.Frame(status_section)
-        status_frame.pack(fill="x", pady=(0, 20))
+        camera_frame = ttk.LabelFrame(top_frame, text="Live Camera Feed", padding="10")
+        camera_frame.pack(side="left", fill="y", padx=(0, 10))
+        camera_frame.config(width=400, height=400)
+        camera_frame.pack_propagate(False)
+
+        self.camera_feed_label = ttk.Label(camera_frame, text="No camera feed", 
+                                          font=("Arial", 12), foreground="gray")
+        self.camera_feed_label.pack(expand=True)
+
+        right_frame = ttk.Frame(top_frame)
+        right_frame.pack(side="right", fill="both", expand=True, padx=(10, 0))
+
+        status_frame = ttk.LabelFrame(right_frame, text="Status", padding="10")
+        status_frame.pack(fill="x", pady=(0, 10))
 
         self.status_label = ttk.Label(
             status_frame,
-            text="🟢 Connected",
-            font=("Arial", 18, "bold"),
+            text="● Подключено",
+            font=("Arial", 14, "bold"),
             foreground="green"
         )
-        self.status_label.pack()
+        self.status_label.pack(pady=(0, 10))
 
-        time_frame = ttk.Frame(status_section)
-        time_frame.pack(fill="x", pady=(0, 20))
-
-        ttk.Label(time_frame, text="Connection Time:", font=("Arial", 12, "bold")).pack(anchor="w")
-        self.connection_time_label = ttk.Label(time_frame, text="00:00:00", font=("Arial", 14))
+        time_label = ttk.Label(status_frame, text="Время подключения:", font=("Arial", 10, "bold"))
+        time_label.pack(anchor="w", pady=(10, 0))
+        self.connection_time_label = ttk.Label(status_frame, text="00:00:00", font=("Arial", 12))
         self.connection_time_label.pack(anchor="w", pady=(5, 0))
 
-        control_frame = ttk.Frame(self.connected_frame)
-        control_frame.pack(fill="x", pady=(20, 0))
+        log_frame = ttk.LabelFrame(right_frame, text="Event Log", padding="10")
+        log_frame.pack(fill="both", expand=True, pady=(10, 0))
 
-        self.reset_button = ttk.Button(
-            control_frame,
-            text="🔄 Reset Connection",
-            command=self.reset_connection
+        self.event_log_text = scrolledtext.ScrolledText(
+            log_frame,
+            height=4,
+            width=40,
+            font=("Courier", 10),
+            state='disabled'
         )
-        self.reset_button.pack(fill="x", ipady=8)
+        self.event_log_text.pack(fill="both", expand=True)
+
+        self.add_event_log_entry("Connected")
 
     def start_spinner_animation(self, _):
         """Start spinner animation"""
@@ -227,6 +258,75 @@ class ChromaAIGui:
 
         self.root.after(1000, self.update_connection_time, None)
 
+    def on_detection_event(self, event: DetectionEvent):
+        """Handle detection event from DetectionService"""
+        try:
+            log_entry = f"{event.color.display_name} detected (conf: {event.confidence:.2f})"
+            self.root.after(0, self.add_event_log_entry, log_entry)
+        except Exception as e:
+            print(f"Error handling detection event: {e}")
+
+    def on_image_processed(self, image: np.ndarray):
+        """Handle processed image with bounding boxes"""
+        try:
+            if len(image.shape) == 3 and image.shape[2] == 3:
+                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            else:
+                image_rgb = image
+
+            height, width = image_rgb.shape[:2]
+            max_size = 400
+            
+            if width > max_size or height > max_size:
+                scale = min(max_size / width, max_size / height)
+                new_width = int(width * scale)
+                new_height = int(height * scale)
+                image_rgb = cv2.resize(image_rgb, (new_width, new_height))
+
+            pil_image = Image.fromarray(image_rgb)
+            photo = ImageTk.PhotoImage(pil_image)
+
+            self.root.after(0, self.update_camera_feed, photo)
+        except Exception as e:
+            print(f"Error processing image: {e}")
+
+    def update_camera_feed(self, photo):
+        """Update camera feed display"""
+        try:
+            if self.camera_feed_label:
+                self.camera_feed_label.config(image=photo)
+                self.camera_feed_label.image = photo  # Keep a reference
+        except Exception as e:
+            print(f"Error updating camera feed: {e}")
+
+    def add_event_log_entry(self, message: str):
+        """Add entry to event log"""
+        try:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            log_entry = f"• [{timestamp}] {message}"
+            
+            self.event_log_entries.append(log_entry)
+            
+            if len(self.event_log_entries) > self.max_log_entries:
+                self.event_log_entries = self.event_log_entries[-self.max_log_entries:]
+            
+            if self.event_log_text:
+                self.event_log_text.config(state='normal')
+                self.event_log_text.delete(1.0, tk.END)
+                self.event_log_text.insert(tk.END, '\n'.join(self.event_log_entries))
+                self.event_log_text.config(state='disabled')
+                self.event_log_text.see(tk.END)
+        except Exception as e:
+            print(f"Error adding event log entry: {e}")
+
+    def disconnect_connection(self):
+        """Disconnect from current connection"""
+        try:
+            connection_manager.set_disconnected()
+            self.add_event_log_entry("Disconnected")
+            messagebox.showinfo("Success", "Disconnected successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to disconnect: {str(e)}")
 
     @staticmethod
     def reset_connection():
@@ -243,3 +343,5 @@ class ChromaAIGui:
 
     def __del__(self):
         app_manager.remove_observer(self.on_app_state_changed)
+        detection_service.remove_observer(self.on_detection_event)
+        detection_service.remove_image_observer(self.on_image_processed)

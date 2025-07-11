@@ -54,7 +54,8 @@ class TunnelManager:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
 
         start_time = time.time()

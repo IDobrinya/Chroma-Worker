@@ -5,8 +5,8 @@ import time
 from typing import Optional
 import requests
 
-from src.chroma_ai.config.config import CLOUDFLARED_PATH, SERVER_API_BASE
-from src.chroma_ai.auth.instance_token import token_manager
+from chroma_ai.config.config import CLOUDFLARED_PATH, SERVER_API_BASE
+from chroma_ai.auth.instance_token import token_manager
 
 logger = logging.getLogger(__name__)
 

@@ -10,11 +10,11 @@ import numpy as np
 from PIL import Image, ImageTk
 from qrcode.main import QRCode
 
-from src.chroma_ai.auth.instance_token import token_manager
-from src.chroma_ai.config.config import WEB_CLIENT_URL
-from src.chroma_ai.services.app_manager import app_manager, ApplicationState
-from src.chroma_ai.services.connection_manager import connection_manager
-from src.chroma_ai.services.detection_service import detection_service
+from chroma_ai.auth.instance_token import token_manager
+from chroma_ai.config.config import WEB_CLIENT_URL, ICON_PATH
+from chroma_ai.services.app_manager import app_manager, ApplicationState
+from chroma_ai.services.connection_manager import connection_manager
+from chroma_ai.services.detection_service import detection_service
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -53,6 +53,10 @@ class ChromaAIGui:
         self.max_log_entries = 100
 
         self.root = tk.Tk()
+
+        icon_image = tk.PhotoImage(file=ICON_PATH)
+        self.root.iconphoto(True, icon_image)
+
         self.root.title("Chroma AI Client")
         self.root.geometry("800x600")
         self.root.resizable(False, False)

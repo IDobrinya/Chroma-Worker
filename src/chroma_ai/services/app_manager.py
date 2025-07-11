@@ -5,10 +5,10 @@ import time
 from enum import Enum
 from typing import Optional, Callable
 
-from src.chroma_ai.auth.instance_token import token_manager
-from src.chroma_ai.server.app import run_server
-from src.chroma_ai.services.connection_manager import connection_manager, ConnectionState
-from src.chroma_ai.services.tunnel_service import tunnel_manager
+from chroma_ai.auth.instance_token import token_manager
+from chroma_ai.server.app import run_server
+from chroma_ai.services.connection_manager import connection_manager, ConnectionState
+from chroma_ai.services.tunnel_service import tunnel_manager
 
 logger = logging.getLogger(__name__)
 

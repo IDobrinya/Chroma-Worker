@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src.chroma_ai.server.ws import ws_router
+from chroma_ai.server.ws import ws_router
 
 app = FastAPI()
 

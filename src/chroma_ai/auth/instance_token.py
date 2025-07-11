@@ -5,7 +5,7 @@ import string
 from pathlib import Path
 import logging
 import requests
-from src.chroma_ai.config.config import SERVER_API_BASE
+from chroma_ai.config.config import SERVER_API_BASE
 
 from appdirs import user_config_dir
 

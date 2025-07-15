@@ -44,7 +44,10 @@ class TokenManager:
             response = requests.post(url, json=payload, timeout=10)
             
             if response.status_code == 200:
-                logger.info(f"Successfully registered server with central server")
+                logger.info("Exists already")
+                return True
+            elif response.status_code == 201:
+                logger.info("Server registered successfully")
                 return True
             else:
                 logger.warning(f"Failed to register server: {response.status_code} - {response.text}")

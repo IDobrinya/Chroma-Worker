@@ -1,9 +1,9 @@
 import threading
 import logging
 
-from src.chroma_ai.services.app_manager import app_manager
-from src.chroma_ai.ui.app import ChromaAIGui
-from src.chroma_ai.auth.instance_token import token_manager
+from chroma_ai.services.app_manager import app_manager
+from chroma_ai.ui.app import ChromaAIGui
+from chroma_ai.auth.instance_token import token_manager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

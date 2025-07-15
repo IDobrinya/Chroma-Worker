@@ -6,8 +6,8 @@ import cv2
 from fastapi import WebSocket, WebSocketDisconnect, APIRouter
 from starlette import status
 
-from src.chroma_ai.services.detection_service import detection_service
-from src.chroma_ai.services.connection_manager import connection_manager
+from chroma_ai.services.detection_service import detection_service
+from chroma_ai.services.connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 

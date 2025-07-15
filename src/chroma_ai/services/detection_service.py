@@ -7,7 +7,7 @@ import cv2
 from cv2.typing import MatLike
 from ultralytics import YOLO
 
-from src.chroma_ai.config.config import MODEL_PATH, BUFFERING_MULTIPLYER
+from chroma_ai.config.config import MODEL_PATH, BUFFERING_MULTIPLYER
 
 logger = logging.getLogger(__name__)
 

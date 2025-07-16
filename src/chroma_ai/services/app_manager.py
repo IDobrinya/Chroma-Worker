@@ -1,4 +1,5 @@
 import logging
+import socket
 import sys
 import threading
 import time
@@ -30,6 +31,7 @@ class AppManager:
         self._tunnel_url: Optional[str] = None
         self._observers: list[Callable] = []
         self._lock = threading.Lock()
+        self._port: Optional[int] = None
 
         self.token = token_manager.get_token()
         logger.info(f"Application initialized with token: {self.token[:8]}...")
@@ -75,8 +77,13 @@ class AppManager:
         self._set_state(ApplicationState.STARTING)
 
         try:
-            threading.Thread(target=run_server, daemon=True).start()
-            self._tunnel_url = tunnel_manager.start(8000)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', 0))
+                s.listen(1)
+                self._port = s.getsockname()[1]
+
+            threading.Thread(target=run_server, args=(self._port,), daemon=True).start()
+            self._tunnel_url = tunnel_manager.start(self._port)
 
             connection_manager.add_observer(self.on_connection_state_changed)
             self._set_state(ApplicationState.WAITING)

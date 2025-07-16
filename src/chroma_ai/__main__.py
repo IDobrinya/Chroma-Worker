@@ -1,11 +1,12 @@
-import threading
 import logging
+import threading
 
+# noinspection PyUnresolvedReferences
+from chroma_ai.config import logging as logging_cfg
+from chroma_ai.auth.instance_token import token_manager
 from chroma_ai.services.app_manager import app_manager
 from chroma_ai.ui.app import ChromaAIGui
-from chroma_ai.auth.instance_token import token_manager
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

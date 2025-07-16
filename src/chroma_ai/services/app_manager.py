@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional, Callable
 
 from chroma_ai.auth.instance_token import token_manager
-from chroma_ai.server.app import run_server
+from chroma_ai.server.app import run_server, stop_server
 from chroma_ai.services.connection_manager import connection_manager, ConnectionState
 from chroma_ai.services.tunnel_service import tunnel_manager
 
@@ -82,7 +82,7 @@ class AppManager:
                 s.listen(1)
                 self._port = s.getsockname()[1]
 
-            threading.Thread(target=run_server, args=(self._port,), daemon=True).start()
+            run_server(self._port)
             self._tunnel_url = tunnel_manager.start(self._port)
 
             connection_manager.add_observer(self.on_connection_state_changed)
@@ -98,6 +98,9 @@ class AppManager:
         self._set_state(ApplicationState.STOPPING)
 
         try:
+            logger.info("Stopping server...")
+            stop_server()
+
             logger.info("Stopping tunnel...")
             tunnel_manager.stop()
 

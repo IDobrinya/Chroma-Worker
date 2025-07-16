@@ -1,7 +1,11 @@
 import uvicorn
+import logging
+import threading
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
+# noinspection PyUnresolvedReferences
+from chroma_ai.config import logging as logging_cfg
 from chroma_ai.server.ws import ws_router
 
 app = FastAPI()
@@ -16,5 +20,47 @@ app.add_middleware(
 
 app.include_router(ws_router)
 
-def run_server():
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "Server is running"}
+
+
+class ServerRunner:
+    def __init__(self):
+        self.server = None
+        self.thread = None
+        self.port = None
+    
+    def start(self, port):
+        self.port = port
+        logger = logging.getLogger("uvicorn")
+        logger.info(f"Starting server on port {port}")
+        
+        config = uvicorn.Config(
+            app=app,
+            host="0.0.0.0",
+            port=port,
+            log_level="info",
+            access_log=True,
+            use_colors=False
+        )
+        
+        self.server = uvicorn.Server(config)
+        self.thread = threading.Thread(target=self.server.run, daemon=False)
+        self.thread.start()
+        
+        return port
+    
+    def stop(self):
+        if self.server:
+            self.server.should_exit = True
+        if self.thread:
+            self.thread.join(timeout=5)
+
+server_runner = ServerRunner()
+
+def run_server(port):
+    return server_runner.start(port)
+
+def stop_server():
+    server_runner.stop()

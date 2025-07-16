@@ -4,8 +4,10 @@ import subprocess
 import time
 from typing import Optional
 import requests
+import threading
 
 from chroma_ai.config.config import CLOUDFLARED_PATH, SERVER_API_BASE
+from chroma_ai.config.logging import cloudflared_log_file
 from chroma_ai.auth.instance_token import token_manager
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ class TunnelManager:
         """
         Initialize tunnel manager
         """
+        self.log_thread = None
         self.port = 8000
         self.process: Optional[subprocess.Popen] = None
         self.tunnel_url: Optional[str] = None
@@ -57,25 +60,15 @@ class TunnelManager:
             universal_newlines=True,
             creationflags=subprocess.CREATE_NO_WINDOW
         )
+        
+        # Start logging thread
+        self.log_thread = threading.Thread(target=self._log_cloudflared_output, daemon=True)
+        self.log_thread.start()
 
         start_time = time.time()
         while time.time() - start_time < 15:
-            if not self.process.stdout:
-                continue
-
-            line = self.process.stdout.readline()
-            if not line:
-                continue
-
-            url_match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
-            if url_match:
-                self.tunnel_url = url_match.group(0).replace("https", "wss")
-                logger.info(f"Tunnel URL: {self.tunnel_url}")
-                
-                self._register_tunnel_url()
-                
+            if self.tunnel_url:
                 return self.tunnel_url
-
             time.sleep(0.5)
 
         raise RuntimeError("Timeout waiting for tunnel URL")
@@ -116,6 +109,24 @@ class TunnelManager:
         
         except Exception as e:
             logger.error(f"Error registering tunnel URL: {e}")
+
+    def _log_cloudflared_output(self) -> None:
+        """Log cloudflared output to file"""
+        if not self.process or not self.process.stdout:
+            return
+        
+        with open(cloudflared_log_file, "a", encoding="utf-8") as f:
+            for line in self.process.stdout:
+                if line.strip():
+                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"{timestamp} - cloudflared - {line}")
+                    f.flush()
+                    
+                    url_match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
+                    if url_match:
+                        self.tunnel_url = url_match.group(0).replace("https", "wss")
+                        logger.info(f"Tunnel URL: {self.tunnel_url}")
+                        self._register_tunnel_url()
 
     @property
     def is_running(self) -> bool:

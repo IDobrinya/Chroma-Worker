@@ -15,4 +15,4 @@ WEB_CLIENT_URL = "https://chroma-ai-weld.vercel.app"
 SERVER_URL = "https://serverregistry-eu-west.up.railway.app"
 SERVER_API_BASE = f"{SERVER_URL}/api/v1"
 
-BUFFERING_MULTIPLYER = 1.2
+BUFFERING_MULTIPLYER = 1.5
